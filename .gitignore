@@ -1,0 +1,25 @@
+# MLflow
+mlruns/
+mlartifacts/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Datos (muy pesados para GitHub)
+data/raw/*.csv
+data/processed/*.csv
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Variables de entorno
+.env
