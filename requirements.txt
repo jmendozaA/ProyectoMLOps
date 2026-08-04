@@ -13,12 +13,26 @@ fastapi==0.104.1
 uvicorn==0.24.0
 pydantic==2.5.2
 
-# Monitoreo
+# === Monitoreo de Drift ===
 scipy==1.11.4
-evidently==0.4.13
+evidently==0.4.17
 
 # UI (puntos extra)
 streamlit==1.29.0
 
+# === Visualización ===
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.18.0
+
+# === Jupyter ===
+jupyter==1.0.0
+notebook==7.0.6
+ipykernel==6.27.1
+
 # Testing
 pytest==7.4.3
+
+# === Utilidades ===
+python-dotenv==1.0.0
+joblib==1.3.2

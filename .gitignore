@@ -1,6 +1,7 @@
 # MLflow
 mlruns/
 mlartifacts/
+mlflow.db
 
 # Python
 __pycache__/
@@ -12,10 +13,18 @@ env/
 # Datos (muy pesados para GitHub)
 data/raw/*.csv
 data/processed/*.csv
+data/processed/*.pkl
+
+# === Python ===
+*.pyc
+*.pyo
+*.egg-info/
+.ipynb_checkpoints/
 
 # IDE
 .vscode/
 .idea/
+*.swp
 
 # Sistema
 .DS_Store
@@ -23,3 +32,10 @@ Thumbs.db
 
 # Variables de entorno
 .env
+*.env
+
+# === Modelos binarios ===
+*.pkl
+*.joblib
+*.h5
+*.pt
