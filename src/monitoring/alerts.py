@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 from pathlib import Path
 import logging
 
-from config import PROCESSED_DATA_DIR
+from src.config import PROCESSED_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

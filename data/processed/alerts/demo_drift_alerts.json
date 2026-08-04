@@ -1,0 +1,42 @@
+[
+  {
+    "timestamp": "2026-08-04T06:35:07.024603",
+    "alert_type": "data_drift",
+    "severity": "low",
+    "message": "Data drift detectado en 1 variables (4.0%). Variables afectadas: School_Type",
+    "details": {
+      "overall_drift_detected": true,
+      "total_tests": 25,
+      "total_with_drift": 1,
+      "drift_percentage": 4.0,
+      "ks_drift_count": 0,
+      "chi2_drift_count": 1,
+      "psi_drift_count": 0
+    },
+    "variables_affected": [
+      "School_Type"
+    ],
+    "status": "active"
+  },
+  {
+    "timestamp": "2026-08-04T06:35:07.085762",
+    "alert_type": "data_drift",
+    "severity": "medium",
+    "message": "Data drift detectado en 4 variables (16.0%). Variables afectadas: Hours_Studied, Family_Income, School_Type, Hours_Studied",
+    "details": {
+      "overall_drift_detected": true,
+      "total_tests": 25,
+      "total_with_drift": 4,
+      "drift_percentage": 16.0,
+      "ks_drift_count": 1,
+      "chi2_drift_count": 2,
+      "psi_drift_count": 1
+    },
+    "variables_affected": [
+      "Hours_Studied",
+      "School_Type",
+      "Family_Income"
+    ],
+    "status": "active"
+  }
+]

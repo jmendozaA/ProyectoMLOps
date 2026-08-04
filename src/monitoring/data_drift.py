@@ -11,7 +11,7 @@ from scipy import stats
 from typing import Dict, List, Tuple, Optional
 import logging
 
-from config import (
+from src.config import (
     NUMERICAL_COLUMNS, CATEGORICAL_COLUMNS,
     DRIFT_KS_THRESHOLD, DRIFT_PSI_THRESHOLD
 )
