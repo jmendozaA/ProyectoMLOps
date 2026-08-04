@@ -1,10 +1,12 @@
 """
 API FastAPI para inferencia del modelo
 Servicio REST que consume el modelo desde MLflow Model Registry.
+Adaptado para Kubernetes con tracking de pod_name para balanceo de carga.
 """
+import os
 import sys
 from pathlib import Path
-import joblib  # <-- Agregado para cargar el preprocesador
+import joblib
 import mlflow
 import pandas as pd
 import numpy as np
@@ -15,20 +17,21 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-import sys
-from pathlib import Path
-
-# 1. Agregar la raíz del proyecto al path de Python para resolver importaciones
+# Agregar la raíz del proyecto al path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# <-- Agregado PROCESSED_DATA_DIR para encontrar el preprocesador
 from src.config import MLFLOW_TRACKING_URI, MODEL_NAME, PROCESSED_DATA_DIR
 from src.inference.model_loader import ModelLoader
 from src.inference.schemas import StudentInput, PredictionOutput, HealthCheck
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# NOMBRE DEL POD (inyectado por Kubernetes automáticamente)
+# ============================================================
+POD_NAME = os.getenv("HOSTNAME", "local-dev")
 
 # ============================================================
 # CARGA DEL PREPROCESADOR (Global)
@@ -62,9 +65,8 @@ request_count: int = 0
 async def lifespan(app: FastAPI):
     """Gestiona el ciclo de vida de la aplicación."""
     global model_loader, start_time
-    
     start_time = time.time()
-    logger.info("🚀 Iniciando servicio de inferencia...")
+    logger.info(f"🚀 Iniciando servicio de inferencia en pod: {POD_NAME}")
     
     # Cargar modelo al inicio
     model_loader = ModelLoader(
@@ -85,7 +87,6 @@ async def lifespan(app: FastAPI):
             logger.error(f"❌ No se pudo cargar ningún modelo: {e2}")
             
     yield
-    
     logger.info("🛑 Apagando servicio de inferencia...")
 
 # ============================================================
@@ -115,16 +116,13 @@ async def log_requests(request: Request, call_next):
     """Middleware para loguear requests."""
     global request_count
     request_count += 1
-    
     start = time.time()
     response = await call_next(request)
     duration = time.time() - start
-    
     logger.info(
-        f"[{request_count}] {request.method} {request.url.path} "
+        f"[{POD_NAME}] [{request_count}] {request.method} {request.url.path} "
         f"- {response.status_code} - {duration:.3f}s"
     )
-    
     return response
 
 # ============================================================
@@ -136,6 +134,7 @@ async def root():
     return {
         "service": "Student Performance Prediction API",
         "version": "1.0.0",
+        "pod_name": POD_NAME,  # ← AGREGADO
         "docs": "/docs",
         "health": "/health"
     }
@@ -144,12 +143,12 @@ async def root():
 async def health_check():
     """Health check del servicio."""
     model_info = model_loader.get_model_info() if model_loader else {}
-    
     return HealthCheck(
         status="healthy",
         model_loaded=model_info.get("is_loaded", False),
         model_version=model_info.get("model_version"),
         model_name=model_info.get("model_name"),
+        pod_name=POD_NAME,  # ← AGREGADO
     )
 
 @app.post("/predict", response_model=PredictionOutput)
@@ -158,7 +157,6 @@ async def predict(student: StudentInput):
     Predice el rendimiento académico de un estudiante.
     """
     global request_count
-    
     if model_loader is None or model_loader.model is None:
         raise HTTPException(
             status_code=503,
@@ -194,6 +192,7 @@ async def predict(student: StudentInput):
             prediction_rounded=int(round(prediction)),
             model_version=model_info.get("model_version", "unknown"),
             model_name=model_info.get("model_name", MODEL_NAME),
+            pod_name=POD_NAME,  # ← AGREGADO
             confidence_note="Prediction based on trained model"
         )
         
@@ -247,6 +246,7 @@ async def predict_batch(students: list[StudentInput]):
             "predictions": results,
             "total": len(results),
             "model_version": model_info.get("model_version", "unknown"),
+            "pod_name": POD_NAME,  # ← AGREGADO
         }
         
     except Exception as e:
@@ -265,14 +265,13 @@ async def model_info():
     info = model_loader.get_model_info()
     info["uptime_seconds"] = round(time.time() - start_time, 2) if start_time else 0
     info["total_requests"] = request_count
-    
+    info["pod_name"] = POD_NAME  # ← AGREGADO
     return info
 
 @app.post("/model/reload")
 async def reload_model(alias: str = "champion"):
     """Recarga el modelo (útil tras actualizaciones)."""
     global model_loader
-    
     try:
         model_loader.reload(alias)
         return {
@@ -293,6 +292,7 @@ async def get_metrics():
         "total_requests": request_count,
         "uptime_seconds": round(time.time() - start_time, 2) if start_time else 0,
         "model_loaded": model_loader.model is not None if model_loader else False,
+        "pod_name": POD_NAME,  # ← AGREGADO
     }
 
 # ============================================================
@@ -300,7 +300,6 @@ async def get_metrics():
 # ============================================================
 if __name__ == "__main__":
     import uvicorn
-    
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
