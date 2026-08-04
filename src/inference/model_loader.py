@@ -1,9 +1,11 @@
 """
-model_loader.py - Carga de modelos desde MLflow Model Registry
-Gestiona la carga del modelo desde el registry, soportando
-versionado por alias (recomendado en MLflow 2.9+) o por versión.
+model_loader.py - Carga de modelos desde MLflow Model Registry o localmente
+Gestiona la carga del modelo, priorizando el registro pero con fallback local
+para garantizar la alta disponibilidad en el contenedor.
 """
 import sys
+import os
+import joblib
 from pathlib import Path
 
 # Agregar el directorio raíz al path
@@ -14,7 +16,6 @@ import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
 import logging
-from typing import Optional
 
 from src.config import MLFLOW_TRACKING_URI, MODEL_NAME
 
@@ -23,6 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 class ModelLoader:
+    """
+    Gestor de carga de modelos.
+    Intenta cargar desde MLflow Registry, y si falla, usa el archivo local empaquetado.
+    """
+
     def __init__(
         self,
         tracking_uri: str = MLFLOW_TRACKING_URI,
@@ -31,56 +37,53 @@ class ModelLoader:
         self.tracking_uri = tracking_uri
         self.model_name = model_name
         self.model = None
-        self.model_version = None
-        self.model_uri = None
+        self.model_version = "unknown"
+        self.model_uri = "unknown"
 
         mlflow.set_tracking_uri(tracking_uri)
         self.client = MlflowClient(tracking_uri=tracking_uri)
 
     def load_by_alias(self, alias: str = "champion") -> object:
-        """Carga el modelo por alias (recomendado en MLflow 2.9+)."""
+        """Intenta cargar el modelo por alias desde MLflow."""
         model_uri = f"models:/{self.model_name}@{alias}"
-        logger.info(f"Cargando modelo desde alias: {model_uri}")
+        logger.info(f"Intentando cargar modelo desde MLflow alias: {model_uri}")
 
         try:
             self.model = mlflow.sklearn.load_model(model_uri)
             self.model_uri = model_uri
             
-            # Obtener información de la versión para logging
+            # Intentar obtener la versión real para los logs
             versions = self.client.search_model_versions(f"name='{self.model_name}'")
             for v in versions:
                 if alias in v.aliases:
                     self.model_version = v.version
                     break
-            
-            logger.info(f"✅ Modelo cargado exitosamente (alias: {alias}, versión: {self.model_version})")
+                    
+            logger.info(f"✅ Modelo cargado exitosamente desde MLflow (alias: {alias}, versión: {self.model_version})")
             return self.model
 
         except Exception as e:
-            logger.error(f"❌ Error cargando modelo con alias '{alias}': {e}")
-            raise
+            logger.warning(f"⚠️ No se pudo cargar desde MLflow ({e}). Usando fallback local...")
+            return self._load_local_model()
 
-    def load_latest_version(self) -> object:
-        """Carga la última versión del modelo (fallback si no hay alias)."""
-        logger.info("Cargando la última versión del modelo como fallback...")
-        try:
-            versions = self.client.search_model_versions(f"name='{self.model_name}'")
-            if not versions:
-                raise ValueError(f"No se encontraron versiones del modelo '{self.model_name}'")
+    def _load_local_model(self) -> object:
+        """Carga el modelo desde el archivo local empaquetado en la imagen Docker."""
+        # Rutas posibles: dentro del contenedor Docker o en desarrollo local
+        docker_path = Path("/app/model/model.joblib")
+        local_path = project_root / "model" / "model.joblib"
+        
+        model_path = docker_path if docker_path.exists() else local_path
+        
+        if not model_path.exists():
+            raise FileNotFoundError(f"No se encontró el modelo ni en MLflow ni localmente en {model_path}")
             
-            latest_version = max(versions, key=lambda v: int(v.version))
-            model_uri = f"models:/{self.model_name}/{latest_version.version}"
-            
-            self.model = mlflow.sklearn.load_model(model_uri)
-            self.model_uri = model_uri
-            self.model_version = latest_version.version
-
-            logger.info(f"✅ Modelo cargado exitosamente (versión: {self.model_version})")
-            return self.model
-
-        except Exception as e:
-            logger.error(f"❌ Error cargando última versión: {e}")
-            raise
+        logger.info(f"Cargando modelo desde archivo local empaquetado: {model_path}")
+        self.model = joblib.load(model_path)
+        self.model_uri = str(model_path)
+        self.model_version = "local-packaged"
+        
+        logger.info("✅ Modelo local cargado exitosamente")
+        return self.model
 
     def get_model_info(self) -> dict:
         """Retorna información del modelo cargado."""
@@ -92,9 +95,9 @@ class ModelLoader:
         }
 
     def reload(self, alias: str = "champion") -> object:
-        """Recarga el modelo (útil para actualizaciones)."""
+        """Recarga el modelo (útil para actualizaciones en caliente)."""
         logger.info("🔄 Recargando modelo...")
         self.model = None
-        self.model_version = None
-        self.model_uri = None
+        self.model_version = "unknown"
+        self.model_uri = "unknown"
         return self.load_by_alias(alias)

@@ -33,12 +33,23 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # CARGA DEL PREPROCESADOR (Global)
 # ============================================================
+preprocessor = None
 try:
-    preprocessor = joblib.load(PROCESSED_DATA_DIR / "preprocessor.pkl")
-    logger.info("✅ Preprocesador cargado correctamente")
+    # En Docker, el archivo está en /app/model/preprocessor.pkl
+    # En desarrollo local, está en la carpeta model/ relativa a la raíz del proyecto
+    docker_path = Path("/app/model/preprocessor.pkl")
+    local_path = Path(__file__).parent.parent.parent / "model" / "preprocessor.pkl"
+    
+    # Usar la ruta de Docker si existe, si no, la local
+    path_to_use = docker_path if docker_path.exists() else local_path
+    
+    if not path_to_use.exists():
+        raise FileNotFoundError(f"No se encontró el preprocesador en {path_to_use}. Asegúrate de haber ejecutado scripts/save_model_local.py")
+        
+    preprocessor = joblib.load(path_to_use)
+    logger.info(f"✅ Preprocesador cargado desde: {path_to_use}")
 except Exception as e:
     logger.error(f"❌ Error cargando preprocesador: {e}")
-    preprocessor = None
 
 # ============================================================
 # CONFIGURACIÓN GLOBAL

@@ -1,0 +1,78 @@
+# ============================================
+# Docker Ignore - Archivos que NO deben entrar al contenedor
+# ============================================
+
+# === Git ===
+.git
+.gitignore
+
+# === Entornos virtuales ===
+env/
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === Datos (NO incluir datasets en la imagen) ===
+data/raw/*.csv
+data/processed/*.csv
+data/processed/*.pkl
+
+# === MLflow local ===
+mlruns/
+mlartifacts/
+mlflow.db
+
+# === Notebooks ===
+notebooks/
+
+# === Documentación ===
+docs/
+*.md
+LICENSE
+
+# === Sistema operativo ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Variables de entorno (NUNCA subir secretos) ===
+.env
+*.env
+
+# === Modelos binarios locales ===
+model/
+*.pkl
+*.joblib
+*.h5
+*.pt
+
+# === Tests ===
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# === Scripts de desarrollo ===
+scripts/
+
+# === Archivos temporales ===
+*.log
+*.tmp
+*.temp
+
+# === Jupyter ===
+.ipynb_checkpoints/
+*.ipynb
+
+# === Docker mismo ===
+docker-compose.yml
+docker-compose.override.yml

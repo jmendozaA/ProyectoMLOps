@@ -1,0 +1,22 @@
+# ============================================
+# Requisitos mínimos para el contenedor Docker
+# Solo incluye lo necesario para servir predicciones
+# ============================================
+
+# === ML (para cargar y ejecutar el modelo) ===
+pandas==2.1.4
+numpy==1.26.2
+scikit-learn==1.3.2
+xgboost==2.0.3
+joblib==1.3.2
+
+# === MLflow (para cargar modelo desde Registry) ===
+mlflow==2.9.2
+
+# === API (servicio de inferencia) ===
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.2
+
+# === Configuración ===
+python-dotenv==1.0.0
