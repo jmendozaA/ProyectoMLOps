@@ -282,17 +282,11 @@ Devuelve el estado del servicio y del modelo.
 ### POST /predict
 Recibe un registro y devuelve una predicción de `Exam_Score`.
 
-### POST /predict/batch
-Recibe una lista de registros y devuelve predicciones en lote.
-
 ### GET /metrics
 Expone métricas básicas del servicio.
 
 ### GET /model/info
 Devuelve información del modelo cargado.
-
-### POST /model/reload?alias=champion
-Recarga el modelo desde el registry.
 
 ## Monitoreo
 
