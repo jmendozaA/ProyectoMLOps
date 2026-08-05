@@ -215,44 +215,6 @@ Ejecuta la demo completa:
 python src/monitoring/demodriftcompleto.py
 ```
 
-Ejemplo manual de data drift:
-
-```python
-from src.monitoring.data_drift import DataDriftDetector
-import pandas as pd
-
-X_train = pd.read_csv("data/processed/X_train.csv")
-current_data = pd.read_csv("data/new_batch.csv")
-
-detector = DataDriftDetector(reference_data=X_train)
-results = detector.run_full_detection(current_data)
-print(results["summary"])
-```
-
-Ejemplo manual de concept drift:
-
-```python
-from src.monitoring.concept_drift import ConceptDriftDetector
-import joblib
-
-model = joblib.load("model/model.joblib")
-
-detector = ConceptDriftDetector(
-    baseline_rmse=8.5,
-    baseline_mae=6.0,
-    baseline_r2=0.75,
-    threshold=0.15,
-)
-
-result = detector.evaluate_batch(
-    model=model,
-    X_batch=X_batch,
-    y_batch=y_batch,
-    batch_name="Lote1",
-)
-print(result)
-```
-
 ## Estructura del proyecto
 
 ```text
