@@ -37,7 +37,7 @@ Este proyecto implementa un pipeline completo de MLOps para predecir `Exam_Score
 - Modelo: XGBoost Regressor.
 - Métricas: RMSE, MAE y R².
 - Variables: 19 features numéricas y categóricas.
-- API: `/predict`, `/predict/batch`, `/health`, `/metrics`, `/model/info`, `/model/reload`.
+- API: `/predict`, `/health`, `/metrics`, `/model/info`.
 - Monitoreo: KS, Chi-cuadrado, PSI y detección de degradación de desempeño.
 
 ## Requisitos
