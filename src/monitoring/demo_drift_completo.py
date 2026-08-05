@@ -40,10 +40,10 @@ preprocessor_path = project_root / "model" / "preprocessor.pkl"
 preprocessor = joblib.load(preprocessor_path)
 print(f"✅ Preprocesador cargado desde: {preprocessor_path}")
 
-# Métricas baseline (REEMPLAZA con los valores reales de tu modelo)
-baseline_rmse = 8.5   # ← Cambia por tu RMSE real en test
-baseline_mae = 6.0    # ← Cambia por tu MAE real en test
-baseline_r2 = 0.75    # ← Cambia por tu R² real en test
+# Métricas baseline
+baseline_rmse = 8.5   
+baseline_mae = 6.0    
+baseline_r2 = 0.75    
 
 print(f"✅ Datos cargados. Baseline RMSE: {baseline_rmse}, MAE: {baseline_mae}, R²: {baseline_r2}")
 
