@@ -69,7 +69,7 @@ Activación del entorno virtual:
 - Windows:
 
 ```bash
-env\Scriptsctivate
+env\Scripts\activate
 ```
 
 - Linux/Mac:
