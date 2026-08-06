@@ -37,7 +37,7 @@ Este proyecto implementa un pipeline completo de MLOps para predecir `Exam_Score
 - Modelo: XGBoost Regressor.
 - Métricas: RMSE, MAE y R².
 - Variables: 19 features numéricas y categóricas.
-- API: `/predict`, `/predict/batch`, `/health`, `/metrics`, `/model/info`, `/model/reload`.
+- API: `/predict`, `/health`, `/metrics`, `/model/info`.
 - Monitoreo: KS, Chi-cuadrado, PSI y detección de degradación de desempeño.
 
 ## Requisitos
@@ -69,7 +69,7 @@ Activación del entorno virtual:
 - Windows:
 
 ```bash
-env\Scriptsctivate
+env\Scripts\activate
 ```
 
 - Linux/Mac:
@@ -215,44 +215,6 @@ Ejecuta la demo completa:
 python src/monitoring/demodriftcompleto.py
 ```
 
-Ejemplo manual de data drift:
-
-```python
-from src.monitoring.data_drift import DataDriftDetector
-import pandas as pd
-
-X_train = pd.read_csv("data/processed/X_train.csv")
-current_data = pd.read_csv("data/new_batch.csv")
-
-detector = DataDriftDetector(reference_data=X_train)
-results = detector.run_full_detection(current_data)
-print(results["summary"])
-```
-
-Ejemplo manual de concept drift:
-
-```python
-from src.monitoring.concept_drift import ConceptDriftDetector
-import joblib
-
-model = joblib.load("model/model.joblib")
-
-detector = ConceptDriftDetector(
-    baseline_rmse=8.5,
-    baseline_mae=6.0,
-    baseline_r2=0.75,
-    threshold=0.15,
-)
-
-result = detector.evaluate_batch(
-    model=model,
-    X_batch=X_batch,
-    y_batch=y_batch,
-    batch_name="Lote1",
-)
-print(result)
-```
-
 ## Estructura del proyecto
 
 ```text
@@ -282,17 +244,11 @@ Devuelve el estado del servicio y del modelo.
 ### POST /predict
 Recibe un registro y devuelve una predicción de `Exam_Score`.
 
-### POST /predict/batch
-Recibe una lista de registros y devuelve predicciones en lote.
-
 ### GET /metrics
 Expone métricas básicas del servicio.
 
 ### GET /model/info
 Devuelve información del modelo cargado.
-
-### POST /model/reload?alias=champion
-Recarga el modelo desde el registry.
 
 ## Monitoreo
 
@@ -318,7 +274,3 @@ Recarga el modelo desde el registry.
 - **Contenedores**: Docker, Kubernetes, Kind.
 - **Monitoreo**: SciPy, NumPy, Matplotlib, Seaborn, Plotly.
 - **Desarrollo**: Python 3.10, Jupyter, Git, pytest.
-
-## Licencia
-
-Este proyecto está bajo licencia MIT.
