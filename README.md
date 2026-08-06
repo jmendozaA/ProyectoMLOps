@@ -1,6 +1,6 @@
 # Student Performance Prediction - MLOps Project
 
-Sistema de MLOps para predecir el rendimiento académico de estudiantes a partir de 19 variables, con entrenamiento reproducible, despliegue en FastAPI, contenedorización con Docker, orquestación en Kubernetes y monitoreo de drift.
+Sistema de MLOps para predecir el rendimiento académico de estudiantes a partir de 19 variables (El dataset trabajado puede encontrarse en: https://www.kaggle.com/datasets/lainguyn123/student-performance-factors), con entrenamiento reproducible, despliegue en FastAPI, contenedorización con Docker, orquestación en Kubernetes y monitoreo de drift.
 
 ## Tabla de contenidos
 - [Descripción](#descripción)
