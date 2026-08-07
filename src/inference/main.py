@@ -1,23 +1,22 @@
 """
 API FastAPI para inferencia del modelo
-Servicio REST que consume el modelo desde MLflow Model Registry.
-Adaptado para Kubernetes con tracking de pod_name para balanceo de carga.
+Servicio REST adaptado para Kubernetes con tracking de pod_name para balanceo de carga.
 """
 import os
+import platform
 import sys
 from pathlib import Path
 import joblib
-import mlflow
 import pandas as pd
 import numpy as np
 import logging
 import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-# Agregar la raíz del proyecto al path
+
+# 1. Agregar la raíz del proyecto al path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -31,23 +30,19 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # NOMBRE DEL POD (inyectado por Kubernetes automáticamente)
 # ============================================================
-POD_NAME = os.getenv("HOSTNAME", "local-dev")
+POD_NAME = os.getenv("HOSTNAME") or "local-dev"
 
 # ============================================================
 # CARGA DEL PREPROCESADOR (Global)
 # ============================================================
 preprocessor = None
 try:
-    # En Docker, el archivo está en /app/model/preprocessor.pkl
-    # En desarrollo local, está en la carpeta model/ relativa a la raíz del proyecto
     docker_path = Path("/app/model/preprocessor.pkl")
-    local_path = Path(__file__).parent.parent.parent / "model" / "preprocessor.pkl"
-    
-    # Usar la ruta de Docker si existe, si no, la local
+    local_path = project_root / "model" / "preprocessor.pkl"
     path_to_use = docker_path if docker_path.exists() else local_path
     
     if not path_to_use.exists():
-        raise FileNotFoundError(f"No se encontró el preprocesador en {path_to_use}. Asegúrate de haber ejecutado scripts/save_model_local.py")
+        raise FileNotFoundError(f"No se encontró el preprocesador en {path_to_use}")
         
     preprocessor = joblib.load(path_to_use)
     logger.info(f"✅ Preprocesador cargado desde: {path_to_use}")
@@ -63,12 +58,10 @@ request_count: int = 0
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Gestiona el ciclo de vida de la aplicación."""
     global model_loader, start_time
     start_time = time.time()
-    logger.info(f"🚀 Iniciando servicio de inferencia en pod: {POD_NAME}")
+    logger.info(f"🚀 Iniciando servicio en pod: {POD_NAME}")
     
-    # Cargar modelo al inicio
     model_loader = ModelLoader(
         tracking_uri=MLFLOW_TRACKING_URI,
         model_name=MODEL_NAME
@@ -79,7 +72,6 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Modelo 'champion' cargado correctamente")
     except Exception as e:
         logger.warning(f"⚠️ No se pudo cargar modelo 'champion': {e}")
-        logger.info("Intentando cargar la última versión como fallback...")
         try:
             model_loader.load_latest_version()
             logger.info("✅ Última versión del modelo cargada como fallback")
@@ -99,7 +91,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -113,7 +104,6 @@ app.add_middleware(
 # ============================================================
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Middleware para loguear requests."""
     global request_count
     request_count += 1
     start = time.time()
@@ -128,107 +118,80 @@ async def log_requests(request: Request, call_next):
 # ============================================================
 # ENDPOINTS
 # ============================================================
-@app.get("/", response_model=dict)
+@app.get("/")
 async def root():
-    """Endpoint raíz."""
     return {
         "service": "Student Performance Prediction API",
         "version": "1.0.0",
-        "pod_name": POD_NAME,  # ← AGREGADO
+        "pod_name": POD_NAME,
         "docs": "/docs",
         "health": "/health"
     }
 
 @app.get("/health", response_model=HealthCheck)
 async def health_check():
-    """Health check del servicio."""
     model_info = model_loader.get_model_info() if model_loader else {}
     return HealthCheck(
         status="healthy",
         model_loaded=model_info.get("is_loaded", False),
         model_version=model_info.get("model_version"),
         model_name=model_info.get("model_name"),
-        pod_name=POD_NAME,  # ← AGREGADO
+        pod_name=POD_NAME,
     )
 
 @app.post("/predict", response_model=PredictionOutput)
 async def predict(student: StudentInput):
-    """
-    Predice el rendimiento académico de un estudiante.
-    """
-    global request_count
     if model_loader is None or model_loader.model is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Modelo no disponible. El servicio no está listo."
-        )
+        raise HTTPException(status_code=503, detail="Modelo no disponible")
     
     if preprocessor is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Preprocesador no disponible. No se puede transformar la entrada."
-        )
+        raise HTTPException(status_code=500, detail="Preprocesador no disponible")
     
     try:
-        # 1. Convertir input a DataFrame
         input_dict = student.model_dump()
         input_df = pd.DataFrame([input_dict])
         
-        # 2. ¡IMPORTANTE! Aplicar la misma transformación que en entrenamiento
         input_df_transformed = pd.DataFrame(
             preprocessor.transform(input_df),
             columns=preprocessor.get_feature_names_out()
         )
         
-        # 3. Hacer predicción con los datos YA transformados (numéricos)
         prediction = model_loader.model.predict(input_df_transformed)[0]
-        prediction = float(np.clip(prediction, 0, 100))  # Clamp entre 0 y 100
+        prediction = float(np.clip(prediction, 0, 100))
         
-        # Obtener info del modelo
         model_info = model_loader.get_model_info()
         
+        # ⭐ AQUÍ ESTÁ LA CLAVE: pasar pod_name=POD_NAME
         return PredictionOutput(
             prediction=round(prediction, 2),
             prediction_rounded=int(round(prediction)),
             model_version=model_info.get("model_version", "unknown"),
             model_name=model_info.get("model_name", MODEL_NAME),
-            pod_name=POD_NAME,  # ← AGREGADO
+            pod_name=POD_NAME,
             confidence_note="Prediction based on trained model"
         )
         
     except Exception as e:
         logger.error(f"Error en predicción: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error interno al procesar la predicción: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 @app.post("/predict/batch")
 async def predict_batch(students: list[StudentInput]):
-    """Predicción en lote para múltiples estudiantes."""
     if model_loader is None or model_loader.model is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Modelo no disponible."
-        )
+        raise HTTPException(status_code=503, detail="Modelo no disponible")
     
     if preprocessor is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Preprocesador no disponible."
-        )
+        raise HTTPException(status_code=500, detail="Preprocesador no disponible")
     
     try:
         input_data = [s.model_dump() for s in students]
         input_df = pd.DataFrame(input_data)
         
-        # Transformar lote completo
         input_df_transformed = pd.DataFrame(
             preprocessor.transform(input_df),
             columns=preprocessor.get_feature_names_out()
         )
         
-        # Predicción en lote
         predictions = model_loader.model.predict(input_df_transformed)
         predictions = np.clip(predictions, 0, 100)
         
@@ -246,64 +209,33 @@ async def predict_batch(students: list[StudentInput]):
             "predictions": results,
             "total": len(results),
             "model_version": model_info.get("model_version", "unknown"),
-            "pod_name": POD_NAME,  # ← AGREGADO
+            "pod_name": POD_NAME,  # ⭐ Y AQUÍ TAMBIÉN
         }
         
     except Exception as e:
         logger.error(f"Error en predicción batch: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error en predicción batch: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.get("/model/info")
 async def model_info():
-    """Información detallada del modelo cargado."""
     if model_loader is None:
         return {"error": "Model loader no inicializado"}
     
     info = model_loader.get_model_info()
     info["uptime_seconds"] = round(time.time() - start_time, 2) if start_time else 0
     info["total_requests"] = request_count
-    info["pod_name"] = POD_NAME  # ← AGREGADO
+    info["pod_name"] = POD_NAME
     return info
-
-@app.post("/model/reload")
-async def reload_model(alias: str = "champion"):
-    """Recarga el modelo (útil tras actualizaciones)."""
-    global model_loader
-    try:
-        model_loader.reload(alias)
-        return {
-            "status": "success",
-            "message": f"Modelo recargado desde alias: {alias}",
-            "model_info": model_loader.get_model_info()
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error recargando modelo: {str(e)}"
-        )
 
 @app.get("/metrics")
 async def get_metrics():
-    """Métricas del servicio."""
     return {
         "total_requests": request_count,
         "uptime_seconds": round(time.time() - start_time, 2) if start_time else 0,
         "model_loaded": model_loader.model is not None if model_loader else False,
-        "pod_name": POD_NAME,  # ← AGREGADO
+        "pod_name": POD_NAME,
     }
 
-# ============================================================
-# EJECUCIÓN
-# ============================================================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
